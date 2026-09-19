@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glass Data - ASIN Skill Library | Robot Task Explorer</title>
+  <meta name="description" content="Futuristic HUD Robot Skill Library & Task Explorer for reviewing robot manipulation tasks, POV video takes, and annotations.">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="styles/dashboard.css">
+  <link rel="stylesheet" href="styles/modal.css">
+</head>
+<body>
+  <!-- Futuristic Scanline & CRT Vignette Overlay -->
+  <div class="scanlines-overlay"></div>
+
+  <div class="dashboard-container">
+    
+    <!-- TOP HUD HEADER (Matching Image 1) -->
+    <header class="hud-header tech-corner-box">
+      <div class="header-left">
+        <h1 class="hud-title">
+          Glass Data <span class="cyan-highlight">- ASIN Skill Library</span>
+        </h1>
+        <div class="hud-subtitle">DYNAMIC 4K 27FPS ASIN-RLA-V9.8 • TACTILE-VISION TELEMETRY</div>
+      </div>
+
+      <div class="header-center">
+        <div class="badge-tag">ASIN TRAINING LIBRARY</div>
+        <div class="badge-tag highlight" id="totalClipsCount">300 CLIPS</div>
+        <div class="badge-tag" id="totalTasksCount">30 TASKS</div>
+      </div>
+
+      <div class="header-right">
+        <div class="telemetry-pill">
+          <span>SPATIAL STATUS</span>
+          <span class="val">VOXELS_OPTIMIZED</span>
+        </div>
+        <div class="telemetry-pill">
+          <span>BATTERY</span>
+          <span class="val" style="color: var(--accent-emerald);">98% / 46.8V</span>
+        </div>
+        <div class="clock-display" id="clockDisplay">14:32:18</div>
+      </div>
+    </header>
+
+    <!-- Drive status banner (auto-synced via tasksData.js) -->
+    <div id="driveApiBanner" style="display:none;"></div>
+
+    <!-- HUD CONTROL & FILTER TOOLBAR -->
+    <section class="hud-toolbar tech-corner-box">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchBoxInput" placeholder="SEARCH TASK OR FOLDER NAME (e.g. Staples, Bottle, Switch)..." autocomplete="off">
+      </div>
+
+      <div class="category-filters" id="categoryFilters">
+        <!-- Filter pills rendered by app.js -->
+      </div>
+
+      <div class="view-actions">
+        <div style="display: flex; gap: 4px;">
+          <button class="action-btn active" id="btnViewGrid" title="Switch to HUD Skill Matrix Grid">
+            <span>🔲</span> GRID
+          </button>
+          <button class="action-btn" id="btnViewFolders" title="Switch to Google Drive Folders View">
+            <span>📁</span> ALL FOLDERS (36)
+          </button>
+        </div>
+        <!-- Drive status pill -->
+        <div id="driveStatusPill" class="drive-status-pill disconnected" title="Click to connect Google Drive API">
+          <span id="driveStatusDot" class="status-dot"></span>
+          <span id="driveStatusLabel">DRIVE: NOT CONNECTED</span>
+        </div>
+        <a href="https://drive.google.com/drive/folders/1nHNmLA6bB_qIQ02KnWZpRFZLBLNje5WN" target="_blank" rel="noopener noreferrer" class="action-btn drive-btn" title="Open Root Google Drive in new tab">
+          <span style="font-size: 1rem;">📂</span> DRIVE (ROBOT)
+        </a>
+        <input type="file" id="folderFileInput" webkitdirectory directory multiple style="display: none;">
+        <button class="action-btn secondary" id="btnImportFolder" title="Load custom folder from computer">
+          <span>📥</span> IMPORT
+        </button>
+        <button class="action-btn" id="btnExportReport" title="Export manager JSON summary">
+          <span>📊</span> REPORT
+        </button>
+        <button class="action-btn" id="btnPresentationMode" title="Full screen HUD view">
+          <span>⛶</span> FULLSCREEN
+        </button>
+      </div>
+    </section>
+
+
+    <!-- MAIN WORKSPACE: LEFT TELEMETRY + TASK MATRIX + RIGHT TELEMETRY -->
+    <main class="hud-workspace">
+      
+      <!-- LEFT SIDEBAR HUD (Matching Image 1) -->
+      <aside class="telemetry-sidebar">
+        
+        <!-- Vision Mode -->
+        <div class="hud-panel tech-corner-box">
+          <div class="panel-header">
+            <span>VISION MODE</span>
+            <span class="dot"></span>
+          </div>
+          <div class="telemetry-list">
+            <div class="telemetry-row"><span>BY:</span> <span class="val">ANCAI KS</span></div>
+            <div class="telemetry-row"><span>RESOLUTION:</span> <span class="val cyan">4K UHD</span></div>
+            <div class="telemetry-row"><span>FRAME RATE:</span> <span class="val">60 FPS</span></div>
+            <div class="telemetry-row"><span>EXPOSURE:</span> <span class="val">AUTO</span></div>
+            <div class="telemetry-row"><span>PRESSURE:</span> <span class="val">94.7%</span></div>
+          </div>
+        </div>
+
+        <!-- Sensors Online Status -->
+        <div class="hud-panel tech-corner-box">
+          <div class="panel-header">
+            <span>SENSORS</span>
+            <span class="dot"></span>
+          </div>
+          <div class="telemetry-list">
+            <div class="telemetry-row"><span>VISION</span> <span class="val online">ONLINE</span></div>
+            <div class="telemetry-row"><span>TACTILE</span> <span class="val online">ONLINE</span></div>
+            <div class="telemetry-row"><span>PROXIMITY</span> <span class="val online">ONLINE</span></div>
+            <div class="telemetry-row"><span>IMU</span> <span class="val online">ONLINE</span></div>
+            <div class="telemetry-row"><span>AUDIO</span> <span class="val online">ONLINE</span></div>
+            <div class="telemetry-row"><span>THERMAL</span> <span class="val online">ONLINE</span></div>
+          </div>
+        </div>
+
+        <!-- System Metrics -->
+        <div class="hud-panel tech-corner-box">
+          <div class="panel-header">
+            <span>SYSTEM METRICS</span>
+            <span class="dot"></span>
+          </div>
+          <div class="telemetry-list">
+            <div class="telemetry-row"><span>CPU LOAD</span> <span class="val cyan">42%</span></div>
+            <div class="telemetry-row"><span>MEMORY</span> <span class="val">68%</span></div>
+            <div class="telemetry-row"><span>GPU TEMP</span> <span class="val">28°C</span></div>
+            <div class="telemetry-row"><span>BUS POWER</span> <span class="val">62%</span></div>
+          </div>
+        </div>
+
+        <!-- Real-Time Coordinates -->
+        <div class="hud-panel tech-corner-box">
+          <div class="panel-header">
+            <span>COORDINATES</span>
+            <span class="dot"></span>
+          </div>
+          <div class="telemetry-list">
+            <div class="telemetry-row"><span id="hudCoords">X:+13.006 Y:-02.362 Z:+01.278</span></div>
+            <div class="telemetry-row"><span>ROLL / PITCH</span> <span class="val">+60.2° / -50.1°</span></div>
+            <div class="telemetry-row"><span>YAW CORRECTION</span> <span class="val cyan">+01.3°</span></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CENTER: 30 SKILL CARDS MATRIX -->
+      <section class="task-grid-container">
+        <div class="task-grid-header">
+          <span id="gridHeaderLabel">TASK MATRIX // CLICK ANY SKILL CARD TO EXPLORE 10 POV TAKES & ANNOTATIONS</span>
+          <span style="color: var(--accent-emerald);" id="datasetLoadedBadge">● 36/36 FOLDERS LOADED</span>
+        </div>
+
+        <!-- Mode 1: HUD Skill Cards Grid -->
+        <div class="task-grid" id="taskGrid">
+          <!-- Dynamically populated with 36 task cards by app.js -->
+        </div>
+
+        <!-- Mode 2: Google Drive Folder View (Matching Image 2) -->
+        <div class="drive-folders-view" id="foldersGrid" style="display: none;">
+          <!-- Dynamically populated with 36 Drive folder tiles -->
+        </div>
+      </section>
+
+      <!-- RIGHT SIDEBAR HUD (Matching Image 1) -->
+      <aside class="telemetry-sidebar">
+        
+        <!-- Radar Widget -->
+        <div class="hud-panel tech-corner-box" style="text-align: center;">
+          <div class="panel-header">
+            <span>SPATIAL RADAR</span>
+            <span class="dot"></span>
+          </div>
+          <div class="radar-widget">
+            <div class="radar-grid"></div>
+            <div class="radar-sweep"></div>
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 0.65rem; color: var(--accent-cyan);">SECTOR SCAN ACTIVE</div>
+        </div>
+
+        <!-- Task Queue -->
+        <div class="hud-panel tech-corner-box">
+          <div class="panel-header">
+            <span>TASK QUEUE</span>
+            <span class="dot"></span>
+          </div>
+          <div class="telemetry-list">
+            <div class="telemetry-row"><span>01 IDLE</span> <span class="val">READY</span></div>
+            <div class="telemetry-row"><span>02 STANDBY</span> <span class="val">ARMED</span></div>
+            <div class="telemetry-row"><span>03 LEARN</span> <span class="val cyan">ACTIVE</span></div>
+            <div class="telemetry-row"><span>04 EXECUTE</span> <span class="val online">PASS</span></div>
+            <div class="telemetry-row"><span>05 VERIFY</span> <span class="val online">PASS</span></div>
+            <div class="telemetry-row"><span>06 COMPLETE</span> <span class="val">98.4%</span></div>
+          </div>
+        </div>
+
+        <!-- Object Detection Stats -->
+        <div class="hud-panel tech-corner-box">
+          <div class="panel-header">
+            <span>OBJECT DETECTION</span>
+            <span class="dot"></span>
+          </div>
+          <div class="telemetry-list">
+            <div class="telemetry-row"><span>HUMAN</span> <span class="val">23</span></div>
+            <div class="telemetry-row"><span>OBJECT</span> <span class="val cyan">156</span></div>
+            <div class="telemetry-row"><span>HAZARD</span> <span class="val" style="color: var(--accent-emerald);">00</span></div>
+            <div class="telemetry-row"><span>PATH CLEAR</span> <span class="val online">YES</span></div>
+          </div>
+        </div>
+
+        <!-- Network -->
+        <div class="hud-panel tech-corner-box">
+          <div class="panel-header">
+            <span>NETWORK FEED</span>
+            <span class="dot"></span>
+          </div>
+          <div class="telemetry-list">
+            <div class="telemetry-row"><span>LATENCY</span> <span class="val">18ms</span></div>
+            <div class="telemetry-row"><span>PACKET LOSS</span> <span class="val online">0%</span></div>
+            <div class="telemetry-row"><span>BANDWIDTH</span> <span class="val cyan">HIGH (4K)</span></div>
+          </div>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- BOTTOM HUD STATUS BAR (Matching Image 1) -->
+    <footer class="hud-footer tech-corner-box">
+      <div class="footer-badge">
+        <div class="footer-badge-icon">👁️</div>
+        <div class="footer-badge-text">
+          <span class="footer-badge-title">VISUAL PROCESSING</span>
+          <span class="footer-badge-status">ACTIVE // 60 FPS</span>
+        </div>
+      </div>
+
+      <div class="footer-badge">
+        <div class="footer-badge-icon">🎯</div>
+        <div class="footer-badge-text">
+          <span class="footer-badge-title">OBJECT TRACKING</span>
+          <span class="footer-badge-status">ACTIVE // 99.4% CONF</span>
+        </div>
+      </div>
+
+      <div class="footer-badge">
+        <div class="footer-badge-icon">🌐</div>
+        <div class="footer-badge-text">
+          <span class="footer-badge-title">DEPTH MAPPING</span>
+          <span class="footer-badge-status">ACTIVE // 3D POINT CLOUD</span>
+        </div>
+      </div>
+
+      <div class="footer-badge">
+        <div class="footer-badge-icon">⚡</div>
+        <div class="footer-badge-text">
+          <span class="footer-badge-title">MOTION PLANNING</span>
+          <span class="footer-badge-status">ACTIVE // SPLINE SMOOTH</span>
+        </div>
+      </div>
+
+      <div class="footer-badge">
+        <div class="footer-badge-icon">🧠</div>
+        <div class="footer-badge-text">
+          <span class="footer-badge-title">LEARNING MODE</span>
+          <span class="footer-badge-status">ADAPTIVE RL + POV</span>
+        </div>
+      </div>
+
+      <div class="footer-badge">
+        <div class="footer-badge-icon">🛡️</div>
+        <div class="footer-badge-text">
+          <span class="footer-badge-title">SAFETY PROTOCOL</span>
+          <span class="footer-badge-status">ENGAGED // TORQUE CAP</span>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- TASK FOLDER EXPLORER & VIDEO PLAYER MODAL -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="task-modal tech-corner-box">
+      
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <div class="modal-breadcrumb">
+          <a href="https://drive.google.com/drive/folders/1nHNmLA6bB_qIQ02KnWZpRFZLBLNje5WN" target="_blank" class="drive-icon-link" title="Open Root ROBOT Drive Folder">
+            📁 Google Drive &gt; My Drive &gt; ROBOT &gt;
+          </a>
+          <a id="modalFolderDriveLink" href="https://drive.google.com/drive/folders/1nHNmLA6bB_qIQ02KnWZpRFZLBLNje5WN" target="_blank" class="crumb-folder" title="Click to open this folder in Google Drive">
+            <span id="modalFolderPath">Unpack_Staples_from_Box</span> ↗
+          </a>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <a id="modalDirectDriveBtn" href="https://drive.google.com/drive/folders/1nHNmLA6bB_qIQ02KnWZpRFZLBLNje5WN" target="_blank" class="action-btn drive-btn-small">
+            <span>📂</span> OPEN IN GOOGLE DRIVE
+          </a>
+          <button class="modal-close-btn" id="modalCloseBtn" title="Close Explorer (Esc)">✕</button>
+        </div>
+      </div>
+
+      <!-- Modal Body (Player Left + Takes List Right) -->
+      <div class="modal-body">
+        
+        <!-- Left Column: Video Feed Simulator & Drive Embed -->
+        <div class="player-section">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 id="modalTaskTitle" style="font-family: var(--font-display); font-size: 1rem; color: #fff; letter-spacing: 1px;">
+              TASK_001 - Unpack Staples from Box
+            </h3>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button class="feed-toggle-btn active" id="btnModeHUD">HUD SIMULATOR</button>
+              <button class="feed-toggle-btn" id="btnModeDrive">DRIVE VIEWER</button>
+            </div>
+          </div>
+
+          <div class="video-screen-container" id="videoScreenContainer">
+            <!-- Canvas HUD Feed -->
+            <canvas id="playerCanvas" class="video-player-canvas"></canvas>
+            
+            <!-- Google Drive Iframe / Direct Embed Container (Hidden by default) -->
+            <div id="driveEmbedContainer" style="display: none; width: 100%; height: 100%; position: absolute; inset: 0; background: #03080e; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
+              <div style="font-size: 2.5rem; margin-bottom: 10px;">📂</div>
+              <h4 style="color: #fff; font-family: var(--font-display); margin-bottom: 8px;">GOOGLE DRIVE TASK FOLDER</h4>
+              <p style="color: var(--text-secondary); font-size: 0.8rem; max-width: 400px; margin-bottom: 16px;">
+                Access original high-resolution master video takes and documentation directly in Google Drive.
+              </p>
+              <a id="driveEmbedLaunchLink" href="https://drive.google.com/drive/folders/1nHNmLA6bB_qIQ02KnWZpRFZLBLNje5WN" target="_blank" class="action-btn drive-btn" style="font-size: 0.85rem; padding: 10px 20px;">
+                <span>🚀</span> LAUNCH GOOGLE DRIVE FOLDER
+              </a>
+            </div>
+
+            <div class="player-hud-overlay" id="playerHudOverlay">
+              <div class="hud-overlay-top">
+                <span style="color: var(--accent-cyan);">● POV CAMERA FEED [60 FPS]</span>
+                <span style="color: var(--accent-emerald);">LATENCY 18ms</span>
+              </div>
+              <div class="hud-overlay-reticle"></div>
+              <div class="hud-overlay-bottom">
+                <span>TACTILE SENSOR: ACTIVE</span>
+                <span id="timecodeDisplay">00:00 / 00:14</span>
+                <span>STATUS: VERIFIED</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Player Controls -->
+          <div class="player-controls" id="playerControlsContainer">
+            <div class="scrubber-bar-container">
+              <div class="scrubber-track" id="scrubberTrack">
+                <div class="scrubber-fill" id="scrubberFill">
+                  <div class="scrubber-handle"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="control-buttons-row">
+              <div class="button-group-left">
+                <button class="btn-ctrl active" id="playPauseBtn">❚❚ PAUSE</button>
+                <button class="btn-ctrl" id="speedSelectBtn">1.0x</button>
+              </div>
+
+              <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary);">
+                RESOLUTION: <strong style="color: var(--accent-cyan);">4K UHD</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Takes / Annotations / Manager Tabs -->
+        <div class="details-section">
+          <div class="modal-tabs">
+            <button class="modal-tab active" data-tab="clips" id="tabClipsButton">VIDEO TAKES</button>
+            <button class="modal-tab" data-tab="annotations">ANNOTATION DOC</button>
+            <button class="modal-tab" data-tab="manager">MANAGER & DRIVE LINK</button>
+          </div>
+
+          <!-- Tab Content 1: Clips List -->
+          <div id="tabContentClips">
+            <div class="clips-grid-title">
+              <span>RECORDED TAKES INSIDE FOLDER</span>
+              <a id="tabClipsDriveAllLink" href="https://drive.google.com/drive/folders/1nHNmLA6bB_qIQ02KnWZpRFZLBLNje5WN" target="_blank" style="font-size: 0.7rem; color: var(--accent-cyan); text-decoration: none;">
+                VIEW ALL IN DRIVE ↗
+              </a>
+            </div>
+            <div class="clips-grid" id="clipsListContainer">
+              <!-- Dynamically populated with takes -->
+            </div>
+          </div>
+
+          <!-- Tab Content 2: Annotation Details -->
+          <div id="tabContentAnnotations" style="display: none;">
+            <div class="annotation-panel">
+              <div class="doc-header-card">
+                <div class="doc-icon">📄</div>
+                <div class="doc-details">
+                  <h4 id="docTitle">Kores_Staples_POV_Annotation.pdf</h4>
+                  <p id="docSummary">Point of View Video Capture with Annotation</p>
+                </div>
+              </div>
+              <div class="annotation-content-box" id="docDetails">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Content 3: Manager Approval & Custom Drive Config -->
+          <div id="tabContentManager" style="display: none;">
+            <div class="annotation-panel">
+              <h4 style="font-family: var(--font-display); color: var(--accent-cyan); font-size: 0.85rem;">
+                MANAGER REVIEW & GOOGLE DRIVE CONFIG
+              </h4>
+              <p style="font-size: 0.75rem; color: var(--text-secondary);">
+                Review task completion status or customize direct Google Drive folder URL for this task.
+              </p>
+              
+              <div style="display: flex; gap: 10px; margin: 10px 0;">
+                <button class="action-btn secondary" id="btnApproveTask" style="flex: 1;">
+                  ✓ APPROVE TASK
+                </button>
+                <button class="action-btn" id="btnRequestRetake" style="flex: 1; border-color: var(--accent-red); color: var(--accent-red);">
+                  ⚠ REQUEST RETAKE
+                </button>
+              </div>
+
+              <!-- Custom Drive URL Input -->
+              <div style="background: rgba(4, 10, 16, 0.8); border: 1px solid var(--border-dim); padding: 10px; margin-top: 10px;">
+                <label style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--accent-cyan); display: block; margin-bottom: 4px;">
+                  CUSTOM GOOGLE DRIVE FOLDER URL / ID:
+                </label>
+                <div style="display: flex; gap: 6px;">
+                  <input type="text" id="customDriveUrlInput" placeholder="https://drive.google.com/drive/folders/..." style="flex: 1; background: #02060a; border: 1px solid var(--border-cyan); color: #fff; padding: 6px 8px; font-family: var(--font-mono); font-size: 0.75rem;">
+                  <button class="action-btn" id="btnSaveDriveUrl" style="padding: 6px 10px; font-size: 0.7rem;">SAVE</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer">
+        <div class="status-indicator-badge" id="modalStatusBadge">
+          STATUS: VERIFIED
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary);">
+          READY FOR MANAGER PRESENTATION
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JavaScript Entry Point -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

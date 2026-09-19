@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robot Manipulation Video Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0ff;
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    padding: 30px;
+  }
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.6rem;
+    background: linear-gradient(90deg, #00f0ff, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+  }
+  .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 30px; }
+  #status-panel {
+    background: #111122;
+    border: 1px solid #222244;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+    color: #aaa;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  #status-panel .log { padding: 3px 0; border-bottom: 1px solid #1a1a2e; }
+  #status-panel .log.success { color: #00ff88; }
+  #status-panel .log.active { color: #00f0ff; }
+  #status-panel .log.error { color: #ff4466; }
+  .controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
+  }
+  button {
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    color: white;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    letter-spacing: 1px;
+  }
+  button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(124,58,237,0.4); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  #btn-generate-all { background: linear-gradient(135deg, #059669, #0891b2); }
+  #progress-bar-wrap {
+    background: #111;
+    border-radius: 999px;
+    height: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  #progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00f0ff, #a855f7);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+  }
+  .thumb-card {
+    background: #111122;
+    border: 1px solid #222244;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+  .thumb-card:hover { border-color: #7c3aed; transform: translateY(-3px); }
+  .thumb-card .preview { width: 100%; aspect-ratio: 4/3; background: #0d0d1a; position: relative; overflow: hidden; }
+  .thumb-card .preview canvas { width: 100%; height: 100%; display: block; }
+  .thumb-card .info { padding: 8px 10px; }
+  .thumb-card .task-num { font-family: 'Orbitron', monospace; font-size: 0.7rem; color: #a855f7; }
+  .thumb-card .task-name { font-size: 0.72rem; color: #ccc; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thumb-card .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #333;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+  .thumb-card.ready .status-dot { background: #00ff88; }
+  .thumb-card.recording .status-dot { background: #ff4444; animation: blink 0.6s infinite; }
+  .thumb-card.done .status-dot { background: #a855f7; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  #main-canvas { display: none; }
+</style>
+</head>
+<body>
+
+<h1>ROBOT TASK VIDEO GENERATOR</h1>
+<p class="subtitle">Generates 42 cinematic thumbnail videos for robot manipulation tasks &bull; WebM format &bull; 800x600px &bull; 6 seconds each</p>
+
+<div id="status-panel">
+  <div class="log">System ready. Click "GENERATE ALL 42 VIDEOS" to start batch production.</div>
+</div>
+
+<div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+
+<div class="controls">
+  <button id="btn-generate-all" onclick="generateAll()">GENERATE ALL 42 VIDEOS</button>
+  <button id="btn-gen-selected" onclick="generateSelected()" disabled>DOWNLOAD SELECTED</button>
+  <button onclick="selectAll()">SELECT ALL</button>
+  <button onclick="clearSelection()">CLEAR</button>
+</div>
+
+<div class="grid" id="task-grid"></div>
+
+<canvas id="main-canvas" width="800" height="600"></canvas>
+
+<script>
+const TASKS = [
+  { num: 1,  file: 'task_01_fruits_griping_supermarket', label: 'FRUITS GRIPPING\nSUPERMARKET',  img: 'images/thumbnails/task_01_fruits_griping_supermarket.jpg', color1: '#ff6b35', color2: '#c2410c' },
+  { num: 2,  file: 'task_02_grip_apple',                 label: 'GRIP APPLE',                   img: 'images/thumbnails/task_02_grip_apple.jpg',                color1: '#ef4444', color2: '#991b1b' },
+  { num: 3,  file: 'task_03_opening_bottle',             label: 'OPENING BOTTLE',                img: 'images/thumbnails/task_03_opening_bottle.jpg',            color1: '#06b6d4', color2: '#0e7490' },
+  { num: 4,  file: 'task_04_graphs_videos',              label: 'GRAPHS VIDEOS',                 img: 'images/thumbnails/task_04_graphs_videos.jpg',             color1: '#8b5cf6', color2: '#5b21b6' },
+  { num: 5,  file: 'task_05_robot_bottle_opening',       label: 'ROBOT BOTTLE\nOPENING',         img: 'images/thumbnails/task_05_robot_bottle_opening.jpg',      color1: '#10b981', color2: '#065f46' },
+  { num: 6,  file: 'task_06_grip_meta_case',             label: 'GRIP META CASE',                img: 'images/thumbnails/task_06_grip_meta_case.jpg',            color1: '#3b82f6', color2: '#1d4ed8' },
+  { num: 7,  file: 'task_07_grip_mouse',                 label: 'GRIP MOUSE',                    img: 'images/thumbnails/task_07_grip_mouse.jpg',                color1: '#f59e0b', color2: '#b45309' },
+  { num: 8,  file: 'task_08_open_coca_cola',             label: 'OPEN COCA-COLA\nBOTTLE',        img: 'images/thumbnails/task_08_open_coca_cola.jpg',            color1: '#dc2626', color2: '#991b1b' },
+  { num: 9,  file: 'task_09_open_close_bottle_new1',     label: 'OPEN/CLOSE\nBOTTLE NEW 1',      img: 'images/thumbnails/task_09_open_close_bottle_new1.jpg',    color1: '#0ea5e9', color2: '#0369a1' },
+  { num: 10, file: 'task_10_open_close_bottle_new',      label: 'OPEN/CLOSE\nBOTTLE NEW',        img: 'images/thumbnails/task_10_open_close_bottle_new.jpg',     color1: '#14b8a6', color2: '#0f766e' },
+  { num: 11, file: 'task_11_3d_test',                    label: '3D TEST',                       img: 'images/thumbnails/task_11_3d_test.jpg',                   color1: '#a78bfa', color2: '#7c3aed' },
+  { num: 12, file: 'task_12_open_close_bottle_001',      label: 'OPEN/CLOSE\nBOTTLE 001',        img: 'images/thumbnails/task_12_open_close_bottle_001.jpg',     color1: '#34d399', color2: '#059669' },
+  { num: 13, file: 'task_13_rayban_case_close',          label: 'RAY-BAN CASE\nCLOSE',           img: null, color1: '#f97316', color2: '#c2410c' },
+  { num: 14, file: 'task_14_rayban_case_open',           label: 'RAY-BAN CASE\nOPEN',            img: null, color1: '#fbbf24', color2: '#d97706' },
+  { num: 15, file: 'task_15_lock_padlock',               label: 'LOCK PADLOCK',                  img: null, color1: '#64748b', color2: '#334155' },
+  { num: 16, file: 'task_16_open_padlock',               label: 'OPEN PADLOCK',                  img: null, color1: '#38bdf8', color2: '#0284c7' },
+  { num: 17, file: 'task_17_jabra',                      label: 'JABRA EARBUDS\nCASE',            img: null, color1: '#c084fc', color2: '#7e22ce' },
+  { num: 18, file: 'task_18_opening_book2',              label: 'OPENING BOOK 2',                 img: null, color1: '#fb923c', color2: '#ea580c' },
+  { num: 19, file: 'task_19_opening_book',               label: 'OPENING BOOK',                  img: null, color1: '#fde68a', color2: '#d97706' },
+  { num: 20, file: 'task_20_closing_book',               label: 'CLOSING BOOK',                  img: null, color1: '#6ee7b7', color2: '#059669' },
+  { num: 21, file: 'task_21_laptop_bag_close',           label: 'LAPTOP BAG\nCLOSE',              img: null, color1: '#7dd3fc', color2: '#0369a1' },
+  { num: 22, file: 'task_22_laptop_bag_open',            label: 'LAPTOP BAG\nOPEN',               img: null, color1: '#86efac', color2: '#166534' },
+  { num: 23, file: 'task_23_folding_tshirt',             label: 'FOLDING T-SHIRT',               img: null, color1: '#fca5a5', color2: '#b91c1c' },
+  { num: 24, file: 'task_24_pour_water',                 label: 'POUR WATER\nCUP TO CUP',         img: null, color1: '#67e8f9', color2: '#0891b2' },
+  { num: 25, file: 'task_25_charger_remove',             label: 'CHARGER WALL\nSOCKET REMOVE',    img: null, color1: '#d8b4fe', color2: '#7c3aed' },
+  { num: 26, file: 'task_26_charger_insert',             label: 'CHARGER WALL\nSOCKET INSERT',    img: null, color1: '#fef08a', color2: '#ca8a04' },
+  { num: 27, file: 'task_27_turn_on_switch',             label: 'TURN ON SWITCH',                img: null, color1: '#4ade80', color2: '#16a34a' },
+  { num: 28, file: 'task_28_load_staple',                label: 'LOAD STAPLE\nINTO STAPLER',      img: null, color1: '#94a3b8', color2: '#475569' },
+  { num: 29, file: 'task_29_uncharging_laptop',          label: 'UNCHARGING\nHP VICTUS 15',       img: null, color1: '#f0abfc', color2: '#a21caf' },
+  { num: 30, file: 'task_30_charging_laptop',            label: 'CHARGING\nHP VICTUS 15',         img: null, color1: '#6ee7b7', color2: '#065f46' },
+  { num: 31, file: 'task_31_turn_off_switch',            label: 'TURN OFF SWITCH',               img: null, color1: '#f87171', color2: '#b91c1c' },
+  { num: 32, file: 'task_32_unpack_kangaro',             label: 'UNPACK KANGARO\nSTAPLER',        img: null, color1: '#fda4af', color2: '#be123c' },
+  { num: 33, file: 'task_33_unpack_staples',             label: 'UNPACK STAPLES\nFROM BOX',       img: null, color1: '#a5b4fc', color2: '#4338ca' },
+  { num: 34, file: 'task_34_pen_open_close',             label: 'PEN OPEN\nAND CLOSE',            img: null, color1: '#fdba74', color2: '#c2410c' },
+  { num: 35, file: 'task_35_insert_cable_charger',       label: 'INSERT CABLE\nINTO CHARGER',     img: null, color1: '#5eead4', color2: '#0f766e' },
+  { num: 36, file: 'task_36_take_glass_box',             label: 'TAKE GLASS\nFROM BOX',           img: null, color1: '#bfdbfe', color2: '#1d4ed8' },
+  { num: 37, file: 'task_37_changing_ac_batteries',      label: 'CHANGING AC\nREMOTE BATTERIES',  img: null, color1: '#fcd34d', color2: '#b45309' },
+  { num: 38, file: 'task_38_insert_earbuds',             label: 'INSERT EARBUDS\nINTO CASE',       img: null, color1: '#c4b5fd', color2: '#6d28d9' },
+  { num: 39, file: 'task_39_connect_charging_cable',     label: 'CONNECT CHARGING\nCABLE',        img: null, color1: '#6ee7b7', color2: '#047857' },
+  { num: 40, file: 'task_40_place_torch_batteries',      label: 'PLACE TORCH\nBATTERIES',         img: null, color1: '#fef9c3', color2: '#ca8a04' },
+  { num: 41, file: 'task_41_remove_cable_charger',       label: 'REMOVE CABLE\nFROM CHARGER',     img: null, color1: '#fca5a5', color2: '#dc2626' },
+  { num: 42, file: 'task_42_remove_torch_batteries',     label: 'REMOVE TORCH\nBATTERIES',        img: null, color1: '#fed7aa', color2: '#ea580c' },
+];
+
+let selected = new Set();
+let isGenerating = false;
+const imgCache = {};
+
+function log(msg, type) {
+  const panel = document.getElementById('status-panel');
+  const div = document.createElement('div');
+  div.className = 'log' + (type ? ' ' + type : '');
+  div.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  panel.appendChild(div);
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function updateProgress(done, total) {
+  document.getElementById('progress-bar').style.width = ((done / total) * 100) + '%';
+}
+
+function preloadImage(src) {
+  return new Promise(function(resolve) {
+    if (!src) { resolve(null); return; }
+    if (imgCache[src]) { resolve(imgCache[src]); return; }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() { imgCache[src] = img; resolve(img); };
+    img.onerror = function() { resolve(null); };
+    img.src = src;
+  });
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function formatTimecode(t) {
+  var m = Math.floor(t / 60);
+  var s = Math.floor(t % 60);
+  var f = Math.floor((t % 1) * 30);
+  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s + ':' + (f < 10 ? '0' : '') + f;
+}
+
+function drawRobotArt(ctx, task, t, W, H) {
+  var cx = W / 2, cy = H / 2 - 20;
+  var orb = ctx.createRadialGradient(cx, cy, 0, cx, cy, 220);
+  orb.addColorStop(0, task.color1 + '33');
+  orb.addColorStop(0.5, task.color2 + '15');
+  orb.addColorStop(1, 'transparent');
+  ctx.fillStyle = orb;
+  ctx.fillRect(0, 0, W, H);
+
+  for (var r = 0; r < 3; r++) {
+    var radius = 100 + r * 60 + Math.sin(t * 1.5 + r) * 10;
+    ctx.save();
+    ctx.globalAlpha = 0.18 - r * 0.04;
+    ctx.strokeStyle = task.color1;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 12]);
+    ctx.lineDashOffset = -t * 30;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(Math.sin(t * 1.2) * 0.1);
+  var armGrad = ctx.createLinearGradient(-30, -120, 30, 0);
+  armGrad.addColorStop(0, task.color1 + 'cc');
+  armGrad.addColorStop(1, task.color2 + '88');
+  ctx.fillStyle = armGrad;
+  ctx.shadowColor = task.color1;
+  ctx.shadowBlur = 20;
+  roundRect(ctx, -20, -130, 40, 90, 8);
+  ctx.fill();
+  ctx.rotate(0.3 + Math.sin(t * 1.5) * 0.1);
+  ctx.fillStyle = armGrad;
+  roundRect(ctx, -15, -10, 30, 80, 6);
+  ctx.fill();
+  ctx.translate(0, 75);
+  var gripOpen = 20 + Math.sin(t * 2) * 8;
+  ctx.fillStyle = '#e0e8ff';
+  ctx.shadowColor = '#ffffff';
+  ctx.shadowBlur = 10;
+  roundRect(ctx, -gripOpen - 8, 0, 18, 35, 4);
+  ctx.fill();
+  roundRect(ctx, gripOpen - 10, 0, 18, 35, 4);
+  ctx.fill();
+  roundRect(ctx, -20, -15, 40, 20, 5);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  for (var i = 0; i < 12; i++) {
+    var angle = (i / 12) * Math.PI * 2 + t * 0.5;
+    var dist = 160 + Math.sin(t + i) * 20;
+    var px = cx + Math.cos(angle) * dist;
+    var py = cy + Math.sin(angle) * dist * 0.6;
+    ctx.globalAlpha = 0.3 + 0.3 * Math.sin(t * 2 + i);
+    ctx.fillStyle = task.color1;
+    ctx.beginPath();
+    ctx.arc(px, py, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawFrame(ctx, task, t, img) {
+  var W = 800, H = 600;
+  ctx.clearRect(0, 0, W, H);
+
+  var bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#050508');
+  bg.addColorStop(0.5, '#0a0a18');
+  bg.addColorStop(1, '#050508');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.globalAlpha = 0.06 + 0.03 * Math.sin(t * 2);
+  ctx.strokeStyle = task.color1;
+  ctx.lineWidth = 1;
+  for (var gx = 0; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+  for (var gy = 0; gy < H; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+  ctx.restore();
+
+  if (img) {
+    var scale = Math.max(W / img.width, H / img.height);
+    var sw = img.width * scale, sh = img.height * scale;
+    var sx = (W - sw) / 2, sy = (H - sh) / 2;
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.drawImage(img, sx, sy, sw, sh);
+    ctx.restore();
+    var ov = ctx.createLinearGradient(0, 0, 0, H);
+    ov.addColorStop(0, 'rgba(5,5,15,0.5)');
+    ov.addColorStop(0.5, 'rgba(5,5,15,0.1)');
+    ov.addColorStop(1, 'rgba(5,5,15,0.85)');
+    ctx.fillStyle = ov;
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    drawRobotArt(ctx, task, t, W, H);
+  }
+
+  ctx.save();
+  ctx.globalAlpha = 0.04;
+  for (var sy2 = 0; sy2 < H; sy2 += 3) {
+    ctx.fillStyle = sy2 % 6 === 0 ? '#000' : '#fff';
+    ctx.fillRect(0, sy2, W, 1);
+  }
+  ctx.restore();
+
+  var bLen = 30, bW = 3;
+  ctx.strokeStyle = task.color1;
+  ctx.lineWidth = bW;
+  ctx.beginPath(); ctx.moveTo(15, 15+bLen); ctx.lineTo(15, 15); ctx.lineTo(15+bLen, 15); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W-15-bLen, 15); ctx.lineTo(W-15, 15); ctx.lineTo(W-15, 15+bLen); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(15, H-15-bLen); ctx.lineTo(15, H-15); ctx.lineTo(15+bLen, H-15); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W-15-bLen, H-15); ctx.lineTo(W-15, H-15); ctx.lineTo(W-15, H-15-bLen); ctx.stroke();
+
+  var numAlpha = Math.min(1, t * 3);
+  ctx.save();
+  ctx.globalAlpha = numAlpha;
+  ctx.font = 'bold 52px Orbitron, monospace';
+  ctx.fillStyle = task.color1;
+  ctx.shadowColor = task.color1;
+  ctx.shadowBlur = 20;
+  ctx.textAlign = 'left';
+  ctx.fillText(String(task.num).padStart(2, '0'), 25, 100);
+  ctx.restore();
+
+  var recX = W - 95, recY = 38;
+  var recBlink = Math.floor(t * 2) % 2 === 0;
+  ctx.save();
+  if (recBlink) {
+    ctx.fillStyle = '#ff2244';
+    ctx.shadowColor = '#ff2244';
+    ctx.shadowBlur = 15;
+    ctx.beginPath(); ctx.arc(recX - 30, recY, 7, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.font = 'bold 18px Orbitron, monospace';
+  ctx.fillStyle = recBlink ? '#ff2244' : '#cc1133';
+  ctx.shadowBlur = 0;
+  ctx.textAlign = 'left';
+  ctx.fillText('REC', recX - 18, recY + 6);
+  ctx.restore();
+
+  ctx.save();
+  ctx.font = '13px Orbitron, monospace';
+  ctx.fillStyle = 'rgba(200,200,255,0.6)';
+  ctx.textAlign = 'left';
+  ctx.fillText(formatTimecode(t), 22, H - 22);
+  ctx.restore();
+
+  var footerGrad = ctx.createLinearGradient(0, H - 160, 0, H);
+  footerGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  footerGrad.addColorStop(1, 'rgba(0,0,0,0.92)');
+  ctx.fillStyle = footerGrad;
+  ctx.fillRect(0, H - 160, W, 160);
+
+  ctx.save();
+  var lineGrad = ctx.createLinearGradient(0, 0, W, 0);
+  lineGrad.addColorStop(0, 'transparent');
+  lineGrad.addColorStop(0.2, task.color1);
+  lineGrad.addColorStop(0.8, task.color2);
+  lineGrad.addColorStop(1, 'transparent');
+  ctx.strokeStyle = lineGrad;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, H - 110); ctx.lineTo(W, H - 110); ctx.stroke();
+  ctx.restore();
+
+  var titleProgress = Math.min(1, Math.max(0, (t - 0.3) * 2.5));
+  var eased = 1 - Math.pow(1 - titleProgress, 3);
+  var lines = task.label.split('\n');
+
+  ctx.save();
+  ctx.globalAlpha = eased;
+  ctx.font = 'bold ' + (lines.length > 1 ? 38 : 44) + 'px Orbitron, monospace';
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = task.color1;
+  ctx.shadowBlur = 25;
+  ctx.textAlign = 'left';
+  if (lines.length === 1) {
+    ctx.fillText(lines[0], 22, H - 60);
+  } else {
+    ctx.fillText(lines[0], 22, H - 80);
+    ctx.fillText(lines[1], 22, H - 42);
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = eased * 0.7;
+  ctx.font = '13px Inter, sans-serif';
+  ctx.fillStyle = task.color1;
+  ctx.textAlign = 'left';
+  ctx.fillText('ROBOT MANIPULATION', 22, H - 16);
+  ctx.restore();
+}
+
+function generateVideo(task) {
+  return new Promise(function(resolve) {
+    preloadImage(task.img).then(function(img) {
+      var canvas = document.getElementById('main-canvas');
+      var ctx = canvas.getContext('2d');
+      var fps = 30;
+      var duration = 6;
+      var totalFrames = fps * duration;
+      var stream = canvas.captureStream(fps);
+      var recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 8000000 });
+      var chunks = [];
+      recorder.ondataavailable = function(e) { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = function() {
+        var blob = new Blob(chunks, { type: 'video/webm' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = task.file + '.webm';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
+        resolve();
+      };
+      recorder.start();
+      var frame = 0;
+      function renderFrame() {
+        if (frame >= totalFrames) { recorder.stop(); return; }
+        drawFrame(ctx, task, frame / fps, img);
+        frame++;
+        setTimeout(renderFrame, 1000 / fps);
+      }
+      renderFrame();
+    });
+  });
+}
+
+function buildGrid() {
+  var grid = document.getElementById('task-grid');
+  grid.innerHTML = '';
+  TASKS.forEach(function(task) {
+    var card = document.createElement('div');
+    card.className = 'thumb-card';
+    card.id = 'card-' + task.num;
+    card.onclick = function() { toggleSelect(task.num); };
+    card.innerHTML =
+      '<div class="preview"><canvas id="prev-' + task.num + '" width="200" height="150"></canvas></div>' +
+      '<div class="info">' +
+        '<div class="task-num"><span class="status-dot" id="dot-' + task.num + '"></span>TASK ' + String(task.num).padStart(2,'0') + '</div>' +
+        '<div class="task-name">' + task.label.replace('\n', ' ') + '</div>' +
+      '</div>';
+    grid.appendChild(card);
+  });
+  TASKS.forEach(function(task) {
+    var pCanvas = document.getElementById('prev-' + task.num);
+    var pCtx = pCanvas.getContext('2d');
+    preloadImage(task.img).then(function(img) {
+      pCtx.save();
+      pCtx.scale(200/800, 150/600);
+      drawFrame(pCtx, task, 1.5, img);
+      pCtx.restore();
+    });
+  });
+}
+
+function toggleSelect(num) {
+  if (selected.has(num)) { selected.delete(num); document.getElementById('card-' + num).classList.remove('ready'); }
+  else { selected.add(num); document.getElementById('card-' + num).classList.add('ready'); }
+  document.getElementById('btn-gen-selected').disabled = selected.size === 0;
+}
+
+function selectAll() {
+  TASKS.forEach(function(t) { selected.add(t.num); document.getElementById('card-' + t.num).classList.add('ready'); });
+  document.getElementById('btn-gen-selected').disabled = false;
+}
+
+function clearSelection() {
+  TASKS.forEach(function(t) { selected.delete(t.num); document.getElementById('card-' + t.num).classList.remove('ready'); });
+  document.getElementById('btn-gen-selected').disabled = true;
+}
+
+async function generateAll() {
+  if (isGenerating) return;
+  await runGeneration(TASKS);
+}
+
+async function generateSelected() {
+  if (isGenerating) return;
+  var toGen = TASKS.filter(function(t) { return selected.has(t.num); });
+  await runGeneration(toGen);
+}
+
+async function runGeneration(tasks) {
+  isGenerating = true;
+  document.getElementById('btn-generate-all').disabled = true;
+  document.getElementById('btn-gen-selected').disabled = true;
+  log('Starting generation of ' + tasks.length + ' videos...', 'active');
+
+  for (var i = 0; i < tasks.length; i++) {
+    var task = tasks[i];
+    var card = document.getElementById('card-' + task.num);
+    card.classList.add('recording');
+    log('Recording Task ' + String(task.num).padStart(2,'0') + ': ' + task.label.replace('\n', ' ') + '...', 'active');
+    await generateVideo(task);
+    await new Promise(function(r) { setTimeout(r, 500); });
+    card.classList.remove('recording');
+    card.classList.add('done');
+    document.getElementById('dot-' + task.num).style.cssText = 'background:#a855f7;animation:none';
+    log('Saved: ' + task.file + '.webm', 'success');
+    updateProgress(i + 1, tasks.length);
+  }
+
+  log('All ' + tasks.length + ' videos generated! Check your Downloads folder.', 'success');
+  isGenerating = false;
+  document.getElementById('btn-generate-all').disabled = false;
+}
+
+buildGrid();
+log('Grid loaded. Tasks 01-12 use existing photorealistic images.', 'success');
+log('Tasks 13-42 use procedural animated robot art.', '');
+</script>
+</body>
+</html>
